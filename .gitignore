@@ -1,0 +1,21 @@
+# Bytecode and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.pytest_cache/v/cache/nodeids
+
+# Database and logs
+state_checkpoint.db
+run_diag.log
+
+# Environment variables
+.env
+
+# Node.js dependencies and build output
+node_modules/
+dist/
+package-lock.json
+
+# Local workspace artifacts
+workspace/
