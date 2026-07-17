@@ -1,6 +1,3 @@
 
-### 2026-07-14 00:14:23 — BLK-008: objetivo STAGES no cumplido
-- No active sub-step found
-
-### 2026-07-14 10:45:56 — BLK-008: objetivo STAGES no cumplido
-- No active sub-step found
+### 2026-07-17 03:54:28 — Fallo en Calidad/Objetivo
+ | Objective failed: Sub-step 1.0 block not found
