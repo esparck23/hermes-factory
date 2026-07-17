@@ -15,6 +15,7 @@ def route_next(state: Dict, current_node: str) -> Optional[str]:
         "qwen_scaffolding",
         "vibe_iteration", 
         "hermes_compiler",
+        "qoder_diagnostics",
         "qoder_audit"
     ]
     

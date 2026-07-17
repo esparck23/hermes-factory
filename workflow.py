@@ -220,10 +220,9 @@ def _merge_state_field(text: str, key_pattern: str, value: str) -> str:
             key_pattern = token + ".*"
             break
     pattern = re.compile(r"(" + re.escape(key_pattern.split(":")[0]) + r"[^\n]*:[ \t]*)([^\n]*)", re.IGNORECASE)
-    replacement = r"\1" + value
     if pattern.search(text):
-        return pattern.sub(replacement, text, count=1)
-    return text + chr(10) + replacement
+        return pattern.sub(lambda m: m.group(1) + value, text, count=1)
+    return text + chr(10) + key_pattern.split(":")[0].replace(".*", "") + ": " + value
 
 
 def _write_state(project: dict, state: TeamState) -> None:
@@ -239,7 +238,8 @@ def _write_state(project: dict, state: TeamState) -> None:
     report = state.get("final_report", "Pipeline ejecutado.")
 
     updated = original
-    updated = _merge_state_field(updated, "🟢 Salud:", "🟢 Salud: Verde")
+    salud_val = "Verde" if state.get("quality_gate_passed") else "Rojo"
+    updated = _merge_state_field(updated, "🟢 Salud:", salud_val)
     updated = _merge_state_field(updated, "Hecho:", report)
     updated = _merge_state_field(updated, "🔜 Sigue:", "Próxima iteración desde prompt cargado.")
     updated = _merge_state_field(updated, "⚠️ Riesgo:", str(risk))
@@ -380,6 +380,11 @@ def _verify_objective(project, state):
 
 def run_for_project(project: dict) -> None:
     root = Path(str(project.get("root", "") or "")).resolve()
+    if not root.exists():
+        print(f"[HARNESS] ⛔ El directorio root no existe: {root}")
+        print(f"[HARNESS]    Proyecto '{project.get('name')}' omitido. Verifica projects.yaml.")
+        return
+
     prompt = _load_prompt(project)
     if not prompt:
         print("[HARNESS] No hay acción activa en STATE.md de " + str(project.get("name")))
@@ -390,10 +395,15 @@ def run_for_project(project: dict) -> None:
         "project_prompt": prompt,
         "target_files": [],
         "current_code_structure": {},
+        "last_execution_logs": "",
         "quality_gate_passed": False,
         "error_diagnostics": None,
         "final_report": "",
         "retry_count": 0,
+        "run_id": None,
+        "attempt": 0,
+        "step": None,
+        "qoder_executed_in_this_run": False,
         "agent_context": {},
     }
 
