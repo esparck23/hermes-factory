@@ -276,12 +276,18 @@ def node_hermes_compiler(state: TeamState) -> TeamState:
     
     # Ejecutar comando de compilación según el tipo de proyecto
     if (project_root / "pyproject.toml").exists():
-        cmd = [sys.executable, "-m", "pytest", "--collect-only", "-q"]
+        cmd = [sys.executable, "-m", "pytest", "-q"]
     elif (project_root / "package.json").exists():
         npm_cmd = "npm.cmd" if os.name == "nt" else "npm"
         cmd = [npm_cmd, "run", "build"]
     else:
-        cmd = ["echo", "No se detectó tipo de proyecto para compilar."]
+        py_files = list(project_root.rglob("*.py"))
+        if py_files:
+            cmd = [sys.executable, "-m", "py_compile"] + [str(f) for f in py_files[:50]]
+        else:
+            state["quality_gate_passed"] = True
+            state["agent_context"].setdefault("hermes_compiler", {})["summary"] = "Sin artefactos compilables."
+            return state
     
     stdout = ""
     stderr = ""
