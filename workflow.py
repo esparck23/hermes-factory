@@ -9,6 +9,11 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from hermes-factory/.env
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 from typing import List, Dict, Optional, Any
 
 import yaml
@@ -397,7 +402,7 @@ def run_for_project(project: dict) -> None:
     
     # Orquestación simplificada tipo grafo artesanal
     nodes = {
-        "pi_scaffolding": node_pi_scaffolding,
+        "qwen_scaffolding": node_qwen_scaffolding,
         "vibe_iteration": node_vibe_iteration,
         "hermes_compiler": node_hermes_compiler,
         "qwen_diagnostics": node_qwen_diagnostics,

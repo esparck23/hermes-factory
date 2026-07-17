@@ -1,4 +1,11 @@
 import os
+import sys
+import re
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Cargar variables de entorno desde .env si existe
+load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 import json
 import re
 import subprocess
@@ -11,16 +18,76 @@ from typing import Dict, List
 from state import TeamState
 
 NODE_TIMEOUT = 180
-EXTRA_PATHS = [
-    r"C:\Users\Agent\AppData\Roaming\npm",
-    r"C:\Users\Agent\.local\bin",
-]
-CLI_PATHS = {
-    "qwen": r"C:\Users\Agent\AppData\Roaming\npm\qwen.cmd",
-    "vibe": r"C:\Users\Agent\.local\bin\vibe.exe",
-    "qodercli": r"C:\Users\Agent\.qoder\bin\qodercli\qodercli.exe",
-    "pi": r"C:\Users\Agent\AppData\Roaming\npm\pi.cmd",
-}
+
+def validate_cli_paths() -> dict:
+    """Validar rutas de CLIs de .env o usar los valores por defecto si existen, con fallback a comandos básicos."""
+    defaults = {
+        "qwen": r"C:\Users\Agent\AppData\Roaming\npm\qwen.cmd",
+        "vibe": r"C:\Users\Agent\.local\bin\vibe.exe",
+        "qodercli": r"C:\Users\Agent\.qoder\bin\qodercli\qodercli.exe",
+        "pi": r"C:\Users\Agent\AppData\Roaming\npm\pi.cmd",
+    }
+    
+    cli_paths = {}
+    for name in ["qwen", "vibe", "qodercli", "pi"]:
+        env_val = os.getenv(f"CLI_{name.upper()}")
+        if env_val:
+            # Si el valor incluye un comando (ej: "python script.py"), validar el script
+            if " " in env_val:
+                # Extraer la ruta del script (último componente)
+                script_path = env_val.split()[-1]
+                if Path(script_path).exists():
+                    cli_paths[name] = env_val
+                else:
+                    print(f"[WARNING] La ruta de entorno CLI_{name.upper()} no existe: '{env_val}'. Usando fallback.")
+                    if Path(defaults[name]).exists():
+                        cli_paths[name] = defaults[name]
+                    else:
+                        cli_paths[name] = name
+            else:
+                # Es una ruta directa
+                if Path(env_val).exists():
+                    cli_paths[name] = env_val
+                else:
+                    print(f"[WARNING] La ruta de entorno CLI_{name.upper()} no existe: '{env_val}'. Usando fallback.")
+                    if Path(defaults[name]).exists():
+                        cli_paths[name] = defaults[name]
+                    else:
+                        cli_paths[name] = name
+        else:
+            if Path(defaults[name]).exists():
+                cli_paths[name] = defaults[name]
+            else:
+                cli_paths[name] = name
+                
+    return cli_paths
+
+
+def validate_extra_paths() -> list:
+    """Validar paths adicionales definidos en CLI_EXTRA_PATHS o defaults."""
+    default_extras = [
+        r"C:\Users\Agent\AppData\Roaming\npm",
+        r"C:\Users\Agent\.local\bin",
+    ]
+    
+    env_val = os.getenv("CLI_EXTRA_PATHS")
+    if env_val:
+        paths = [p.strip() for p in env_val.split(";") if p.strip()]
+    else:
+        paths = default_extras
+        
+    valid_paths = []
+    for path in paths:
+        if Path(path).exists():
+            valid_paths.append(path)
+        else:
+            print(f"[WARNING] Path adicional no existe y se ignora: '{path}'")
+    return valid_paths
+
+
+CLI_PATHS = validate_cli_paths()
+EXTRA_PATHS = validate_extra_paths()
+# Removed old EXTRA_PATHS and CLI_PATHS definitions
 
 
 def _with_extended_env() -> dict:
@@ -44,10 +111,23 @@ def _with_vibe_env() -> dict:
 
 
 def _resolve_cmd(cmd: List[str]) -> List[str]:
+    import shlex
     resolved = []
     for c in cmd:
         if c in CLI_PATHS:
-            resolved.append(CLI_PATHS[c])
+            cli_value = CLI_PATHS[c]
+            try:
+                # shlex.split con posix=False maneja correctamente rutas de Windows con espacios y comillas
+                split_cmd = shlex.split(cli_value, posix=False)
+                resolved.extend(split_cmd)
+            except Exception:
+                last_space_idx = cli_value.rfind(' ')
+                if last_space_idx != -1:
+                    executable = cli_value[:last_space_idx]
+                    script = cli_value[last_space_idx + 1:]
+                    resolved.extend([executable, script])
+                else:
+                    resolved.append(cli_value)
         else:
             resolved.append(c)
     return resolved
@@ -90,7 +170,7 @@ def _atomic_write(project_root: Path, files: Dict[str, str]) -> TeamState:
     return state
 
 
-def node_pi_scaffolding(state: TeamState) -> TeamState:
+def node_qwen_scaffolding(state: TeamState) -> TeamState:
     print("[HERMES LOG] Invocando a Pi para scaffolding inicial...")
     project_root = _project_path(state, ".")
     prompt = state.get("project_prompt") or "Desarrollar componentes según el estado actual."
@@ -108,7 +188,7 @@ def node_pi_scaffolding(state: TeamState) -> TeamState:
     )
 
     cmd = [
-        CLI_PATHS["pi"],
+        "pi",
         "--mode", "json",
         "--no-session",
         "-p", full_prompt,
@@ -116,8 +196,8 @@ def node_pi_scaffolding(state: TeamState) -> TeamState:
     try:
         proc = subprocess.run(_resolve_cmd(cmd), cwd=str(project_root), capture_output=True, text=True, check=False, timeout=300, env=_with_extended_env())
     except subprocess.TimeoutExpired:
-        state["last_execution_logs"] = "Pi timeout (5 min)"
-        state["error_diagnostics"] = "timeout: Pi no completó la tarea en 5 minutos"
+        state["last_execution_logs"] = "Qwen timeout (5 min)"
+        state["error_diagnostics"] = "timeout: Qwen no completó la tarea en 5 minutos"
         state.setdefault("retry_count", 0)
         state["retry_count"] += 1
         return state
@@ -159,7 +239,7 @@ def node_vibe_iteration(state: TeamState) -> TeamState:
     )
 
     cmd = [
-        CLI_PATHS["vibe"],
+        "vibe",
         "--mode", "json",
         "-p", full_prompt,
     ]
@@ -196,9 +276,10 @@ def node_hermes_compiler(state: TeamState) -> TeamState:
     
     # Ejecutar comando de compilación según el tipo de proyecto
     if (project_root / "pyproject.toml").exists():
-        cmd = ["python", "-m", "py_compilecheck"]
+        cmd = [sys.executable, "-m", "pytest", "--collect-only", "-q"]
     elif (project_root / "package.json").exists():
-        cmd = ["npm", "run", "build"]
+        npm_cmd = "npm.cmd" if os.name == "nt" else "npm"
+        cmd = [npm_cmd, "run", "build"]
     else:
         cmd = ["echo", "No se detectó tipo de proyecto para compilar."]
     
@@ -233,8 +314,8 @@ def node_hermes_compiler(state: TeamState) -> TeamState:
     return state
 
 
-def node_qwen_diagnostics(state: TeamState) -> TeamState:
-    print("[HERMES LOG] Ejecutando diagnóstico con Qwen...")
+def node_qoder_diagnostics(state: TeamState) -> TeamState:
+    print("[HERMES LOG] Ejecutando diagnóstico con Qoder (qwen role)...")
     project_root = _project_path(state, ".")
     prompt = state.get("project_prompt") or "Diagnostica el error y sugiere soluciones."
     
@@ -252,7 +333,7 @@ def node_qwen_diagnostics(state: TeamState) -> TeamState:
     )
 
     cmd = [
-        CLI_PATHS["qwen"],
+        "pi",
         "--mode", "json",
         "--max-session-turns", "8",
         "--max-tool-calls", "30",
@@ -278,7 +359,7 @@ def node_qwen_diagnostics(state: TeamState) -> TeamState:
     
     # Registrar contexto del agente
     state["agent_context"] = state.get("agent_context", {})
-    state["agent_context"]["qwen_diagnostics"] = {
+    state["agent_context"]["qoder_diagnostics"] = {
         "summary": summary,
         "timestamp": datetime.now().isoformat()
     }
@@ -286,8 +367,8 @@ def node_qwen_diagnostics(state: TeamState) -> TeamState:
     return state
 
 
-def node_qoder_audit(state: TeamState) -> TeamState:
-    print("[HERMES LOG] Ejecutando auditoría con Qoder...")
+def node_pi_audit(state: TeamState) -> TeamState:
+    print("[HERMES LOG] Ejecutando auditoría con Pi (qoder role)...")
     project_root = _project_path(state, ".")
     prompt = state.get("project_prompt") or "Audita el código y reporta vulnerabilidades."
     
@@ -304,7 +385,7 @@ def node_qoder_audit(state: TeamState) -> TeamState:
     )
 
     cmd = [
-        CLI_PATHS["qodercli"],
+        "pi",
         "--mode", "json",
         "--max-session-turns", "10",
         "--max-tool-calls", "40",
@@ -330,7 +411,7 @@ def node_qoder_audit(state: TeamState) -> TeamState:
     
     # Registrar contexto del agente
     state["agent_context"] = state.get("agent_context", {})
-    state["agent_context"]["qoder_audit"] = {
+    state["agent_context"]["pi_audit"] = {
         "summary": summary,
         "timestamp": datetime.now().isoformat()
     }
