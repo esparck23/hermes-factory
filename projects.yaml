@@ -1,7 +1,7 @@
 projects:
-  - name: finty-app
-    root: C:\Users\Agent\dev\finty-app
-    stack: nextjs-typescript
-  - name: test-project
-    root: C:\Users\Agent\hermes-factory\sandbox\test-project
-    stack: nextjs-typescript
+- name: finty-app
+  root: C:\Users\Agent\dev\finty-app
+  stack: nextjs-typescript
+- name: test-project
+  root: C:\Users\Agent\dev\hermes-factory\sandbox\test-project
+  stack: nextjs-typescript

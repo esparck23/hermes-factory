@@ -63,3 +63,58 @@ When conflicts arise in YAML configurations (`projects.yaml`, `active.yaml`):
 
 - **`active.yaml` conflicts**: Always default to the collaborator's active settings or merge them under separate array elements.
 - **`projects.yaml` conflicts**: Keep all projects listed; do not delete catalog entries created by other collaborators.
+
+---
+
+## 5. Environment Setup (Required for All Collaborators)
+
+Both human developers and autonomous agents **must** perform the following setup steps after cloning the repository. This ensures the Hermes A2A Factory motor can locate CLI tools and required dependencies in any environment.
+
+### 5.1 Install Python Dependencies
+
+The project uses `python-dotenv` for environment management, `pyyaml` for configuration, and `pytest` for tests. Install them via:
+
+```powershell
+pip install -r requirements.txt
+```
+
+If `pip` is not found, use:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+### 5.2 Configure `.env` File
+
+The motor loads CLI paths dynamically from environment variables defined in a `.env` file at the project root.
+
+1. Copy the template:
+   ```powershell
+   copy .env.example .env
+   ```
+2. Edit `.env` and register the correct paths for your local CLI installations:
+   ```text
+   CLI_PI=C:\path\to\pi.cmd
+   CLI_VIBE=C:\path\to\vibe.exe
+   CLI_QWEN=C:\path\to\qwen.cmd
+   CLI_QODERCLI=C:\path\to\qodercli.exe
+   CLI_EXTRA_PATHS=C:\path1;C:\path2
+   ```
+3. The motor validates each path on startup. If a path does not exist, it falls back to the bare command name (assuming it is in the system `PATH`).
+
+### 5.3 Verify the Setup
+
+Run a quick smoke test to confirm `nodes.py` loads paths correctly:
+
+```powershell
+python -c "from nodes import CLI_PATHS, EXTRA_PATHS; print(CLI_PATHS); print(EXTRA_PATHS)"
+```
+
+If the output shows valid paths and no `[WARNING]` messages are printed, the setup is correct.
+
+### 5.4 Agents Must Also Follow This Protocol
+
+Autonomous agents must:
+1. Detect the presence of `.env` at startup. If missing, **abort** and report a configuration error.
+2. Never hardcode absolute paths to `C:\Users\Agent\...` in their code. Use the `CLI_PATHS` dictionary from `nodes.py`.
+3. Run `pip install -r requirements.txt` as part of their initial environment handshake.

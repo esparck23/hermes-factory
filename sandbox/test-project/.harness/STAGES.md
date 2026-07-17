@@ -1,4 +1,3 @@
-**Etapa 1**
-1.1 Crear src/index.ts y test mínimo
-- Crear `src/index.ts`
-- Crear `tests/index.test.ts`
+﻿# STAGES
+Sub-paso activo: 1.0
+- [ ] Etapa 1: Scaffolding y Estructura Base

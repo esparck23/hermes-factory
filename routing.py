@@ -7,12 +7,12 @@ def route_next(state: Dict, current_node: str) -> Optional[str]:
     
     Lógica:
     - Si el Quality Gate pasó, avanza al siguiente paso.
-    - Si falló, va a diagnóstico (qwen) o reparación (vibe).
+    - Si falló, va a diagnóstico (qoder) o reparación (vibe).
     - Si es el último paso, termina.
     """
     # Orden de ejecución estándar
     flow_order = [
-        "pi_scaffolding",
+        "qwen_scaffolding",
         "vibe_iteration", 
         "hermes_compiler",
         "qoder_audit"
@@ -31,15 +31,15 @@ def route_next(state: Dict, current_node: str) -> Optional[str]:
     
     # Si falló, va a diagnóstico
     if current_node == "hermes_compiler":
-        return "qwen_diagnostics"
+        return "qoder_diagnostics"
     
     # Si qwen ya diagnosticó, vuelve a vibe para reparar
-    if current_node == "qwen_diagnostics":
+    if current_node == "qoder_diagnostics":
         return "vibe_iteration"
     
     # Tras pi_scaffolding (primer paso), avanzar a vibe_iteration
     # sin importar quality gate (el gate lo corre hermes_compiler después).
-    if current_node == "pi_scaffolding":
+    if current_node == "qwen_scaffolding":
         return "vibe_iteration"
     
     # Tras vibe_iteration, avanzar a hermes_compiler (quien corre el quality gate).
@@ -47,9 +47,6 @@ def route_next(state: Dict, current_node: str) -> Optional[str]:
         return "hermes_compiler"
     
     # Si vibe falló en reparación post-diagnóstico, volver a compilar
-    if current_node == "vibe_iteration" and state.get("error_diagnostics"):
-        return "hermes_compiler"
-    
     return None
 
 
@@ -58,4 +55,4 @@ def router_quality_gate(state: Dict) -> str:
         return "approved"
     if state.get("retry_count", 0) >= 3:
         return "human_interrupt"
-    return "fix_with_qwen"
+    return "fix_with_qoder"
